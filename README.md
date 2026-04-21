@@ -14,3 +14,5 @@ There are a lot of functions should be in project, yet it works at minimal base 
 Source code contains some bad practices so it's not ideal.
 
 If something doesn't work, try fix it on your own.
+
+Required libraries: PyQt6, mutagen
