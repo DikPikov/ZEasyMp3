@@ -7,12 +7,13 @@ Currently app provides such functionals:
 1. full scan for mp3 files in pc
 2. playing audio from mp3
 3. search audio files from tracklist by name
-4. play queue
-5. changing audio pitch in-place
+4. tracks queue
+5. queue shuffling
+6. changing audio pitch in-place (slowed/speedup effect)
 
-There are a lot of functions should be in project, yet it works at minimal base level. 
-Source code contains some bad practices so it's not ideal.
+The player works stable, taking ~250MB RAM and <1% CPU.
+Enjoy it.
 
-If something doesn't work, try fix it on your own.
+Source code is not ideal. Yet you can check it and learn maybe something new.
 
 Required libraries: PyQt6, mutagen
