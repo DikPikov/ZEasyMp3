@@ -1,0 +1,13 @@
+config=Настройки
+play_all=Играть всё
+tracks=Треки
+queue=Очередь
+search=поиск...
+pitch=Питч %
+volume=Громкость
+update_tracklist=обновить треклист
+full_scan=полный скан
+add_folder=добавить папку
+Quitting=Выход
+Quit_sure=Вы собираетесь выйти ?
+need_folders=Выберите папки с музыкой в Настройках

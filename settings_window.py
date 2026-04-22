@@ -75,18 +75,29 @@ class SettingsWindow(QMainWindow):
     def __init__(self, main_window):
         super().__init__();
         
+        self._initialized = False;
+        
         self._folders = []
         self._window = main_window
         self._main = main_window._main
         self._pitch = None
         self._pitch_slider = None
-        try:
-            self.init_elements()
-            self.update_folders()
-            self.init_window()
-        except Exception as ex:
-            print(ex)
+        
+        self.init_elements()
+        self.update_folders()
+        self.init_window()
+            
+        self._initialized = True;
 
+    
+    def resizeEvent(self, event):
+        if(not self._initialized):
+            super().resizeEvent(event)
+            return
+        
+        self.update_folders()
+        super().resizeEvent(event)
+        
     def set_pitch(self, text):
 
         if(text == ""):
@@ -102,6 +113,12 @@ class SettingsWindow(QMainWindow):
         self._window._main.set_pitch(value / 1000)
         
 
+    def slide_volume(self):
+        value = self._volume_slider.value()
+        self._volume.setText(f"{self._window.locale.string['volume']} {int(self._window._main.volume * 100)}%")
+
+        self._window._main.set_volume(value / 1000)
+        
     def open_folder(self, folder):
         try:
             url = QUrl.fromLocalFile(folder)
@@ -142,15 +159,19 @@ class SettingsWindow(QMainWindow):
         grid.setRowMinimumHeight(3, 30)
         grid.setRowMinimumHeight(4, 30)
         grid.setRowMinimumHeight(5, 30)
+        grid.setRowMinimumHeight(6, 30)
+        grid.setRowMinimumHeight(7, 30)
         grid.setRowStretch(0, 0)
         grid.setRowStretch(1, 0)
         grid.setRowStretch(2, 0)
         grid.setRowStretch(3, 0)
         grid.setRowStretch(4, 0)
         grid.setRowStretch(5, 0)
-        grid.setRowStretch(6, 1)
+        grid.setRowStretch(6, 0)
+        grid.setRowStretch(7, 0)
+        grid.setRowStretch(8, 1)
 
-        pitch_label = QLabel("Pitch %")
+        pitch_label = QLabel(self._window.locale.string["pitch"])
         pitch_label.setStyleSheet("margin: 0px 10px 0px 10px")
         
         pitch = QLineEdit()
@@ -177,16 +198,40 @@ class SettingsWindow(QMainWindow):
         }
         """)
         pitch_slider.setValue(int(self._window._main.pitch * 1000))
+
+
+        volume_label = QLabel(f"{self._window.locale.string['volume']} {int(self._window._main.volume * 100)}%")
+        volume_label.setStyleSheet("margin: 0px 10px 0px 10px")
+
+        volume_slider = QSlider(Qt.Orientation.Horizontal)
+        volume_slider.setMinimum(0)
+        volume_slider.setMaximum(1000)
+        volume_slider.setTickInterval(0)
+        volume_slider.sliderMoved.connect(self.slide_volume)
+        volume_slider.setStyleSheet("""
+        QSlider::groove:horizontal {
+        background: #ddd;
+        height: 6px;
+        left: 10px; right: 10px; /* Internal margins for the groove */
+        }
+        QSlider::handle:horizontal {
+            background: #555;
+            width: 13px;
+            margin: -3px 0; /* Centers handle over the groove */
+        }
+        """)
+        volume_slider.setValue(int(self._window._main.volume * 1000))
+
         
-        search_btn = QPushButton("update tracks")
+        search_btn = QPushButton(self._window.locale.string['update_tracklist'])
         search_btn.setStyleSheet("margin: 0px 10px 0px 10px; padding: 2px 0px 2px 0px;")
         search_btn.clicked.connect(self.search)
         
-        full_search_btn = QPushButton("full scan")
+        full_search_btn = QPushButton(self._window.locale.string['full_scan'])
         full_search_btn.setStyleSheet("margin: 0px 10px 0px 10px; padding: 2px 0px 2px 0px;")
         full_search_btn.clicked.connect(self.full_search)
         
-        add_folder_btn = QPushButton("add directory")
+        add_folder_btn = QPushButton(self._window.locale.string['add_folder'])
         add_folder_btn.setStyleSheet("margin: 0px 10px 0px 10px; padding: 2px 0px 2px 0px;")
         add_folder_btn.clicked.connect(self.add_folder)
          
@@ -199,14 +244,18 @@ class SettingsWindow(QMainWindow):
         grid.addWidget(pitch_label, 0, 0)
         grid.addWidget(pitch, 1, 0)
         grid.addWidget(pitch_slider, 2, 0)
-        grid.addWidget(search_btn, 3, 0)
-        grid.addWidget(full_search_btn, 4, 0)
-        grid.addWidget(add_folder_btn, 5, 0)
-        grid.addWidget(folder_view, 6, 0)
+        grid.addWidget(volume_label, 3, 0)
+        grid.addWidget(volume_slider, 4, 0)
+        grid.addWidget(search_btn, 5, 0)
+        grid.addWidget(full_search_btn, 6, 0)
+        grid.addWidget(add_folder_btn, 7, 0)
+        grid.addWidget(folder_view, 8, 0)
 
         self._folder_view = folder_view
         self._pitch = pitch
         self._pitch_slider = pitch_slider
+        self._volume = volume_label
+        self._volume_slider = volume_slider
         
         root.setLayout(grid)
         self.setCentralWidget(root)
@@ -236,7 +285,7 @@ class SettingsWindow(QMainWindow):
 
     def init_window(self):
         self.setMinimumSize(200, 300)
-        self.setWindowTitle('settings')
+        self.setWindowTitle(self._window.locale.string["config"])
         self.show()
     
     

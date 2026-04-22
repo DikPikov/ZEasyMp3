@@ -1,0 +1,13 @@
+config=Config
+play_all=Play All
+tracks=Tracks
+queue=Queue
+search=search...
+pitch=Pitch %
+volume=Volume
+update_tracklist=Update tracklist
+full_scan=Full scan
+add_folder=Add folder
+Quitting=Quitting
+Quit_sure=You want to quit ?
+need_folders=Pick directories that contain mp3 in Config

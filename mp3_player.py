@@ -11,18 +11,15 @@ class Mp3Player(QObject):
     track_finished = pyqtSignal()
     track_step = pyqtSignal()
     
-    def __init__(self, track, pitch, channel): #channel = [0 seek, 1 playing, 2 length, 3 position, 4 dispose, 5 fileLength, 6 track]
+    def __init__(self, track, pitch, channel): #channel = [0 seek, 1 playing, 2 length, 3 position, 4 fileLength, 5 track, 6 volume]
         super().__init__()
         self._channel = channel
 
         self._track = track
         self._pitch = pitch
+        self._volume = channel[6]            
 
-        self._mutex = QMutex()
-        
-        self._pcm = None
-        if(self._pcm == None):
-            self._pcm = bytearray()
+        self._pcm = bytearray()
         self._pcm_index = 0
 
         self._disposed = False;
@@ -48,12 +45,6 @@ class Mp3Player(QObject):
             if(buffer.isValid()):
                 self._pcm.extend(bytes(buffer.constData()))
 
-                if(self._channel[4]):
-                    if(self._disposed):
-                        return
-                    self.dispose()
-                    return
-            
                 if(self._channel[1]):
                     to_write =self._audio_device.bytesToWrite() 
             
@@ -63,9 +54,13 @@ class Mp3Player(QObject):
                 if(self._channel[0] != -1):
                     self._channel[3] = self._channel[0]
                 else:
-                    self._channel[3] = self._pcm_index / self._channel[5]
-
+                    self._channel[3] = self._pcm_index / self._channel[4]
+                
                 if(time.time() - self._last_step > 0.15):
+                    if(self._volume != self._channel[6]):
+                        self._volume = self._channel[6]
+                        self._audio_sink.setVolume(self._volume)
+                        
                     self._last_step = time.time()
                     self.track_step.emit()
         except Exception as ex:
@@ -95,13 +90,6 @@ class Mp3Player(QObject):
         written = 1
         
         while self._pcm_index < len(self._pcm):
-            if(self._channel[4]):
-                if(self._disposed ):
-                    return
-                
-                self.dispose()
-                return
-            
             if(self._channel[1]):
                 to_write =self._audio_device.bytesToWrite() 
             
@@ -109,13 +97,18 @@ class Mp3Player(QObject):
                 self._pcm_index += written
                 
             
-            self._channel[3] = self._pcm_index / self._channel[5]
+            self._channel[3] = self._pcm_index / self._channel[4]
             
             while(self._channel[0] != -1):
                 self._channel[3] = self._channel[0]
-                self._pcm_index = int((self._channel[0] * self._channel[5] // 8) * 8)
+                self._pcm_index = int((self._channel[0] * self._channel[4] // 8) * 8)
                 self._channel[0] = -1
                 QThread.msleep(200)
+
+            if(self._volume != self._channel[6]):
+                self._volume = self._channel[6]
+                self._audio_sink.setVolume(self._volume)
+                print(f"change volume {self._volume}")
             
             self.track_step.emit()
             QThread.msleep(50)
@@ -145,6 +138,6 @@ class Mp3Player(QObject):
         self._decoder.start()
         self._channel[2] = audio.info.length / self._pitch
         self._channel[1] = True
-        self._channel[5] = total_bytes = audio.info.length * audio.info.sample_rate * audio.info.channels * 4
+        self._channel[4] = total_bytes = audio.info.length * audio.info.sample_rate * audio.info.channels * 4
         
 

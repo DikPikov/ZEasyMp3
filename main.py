@@ -7,15 +7,22 @@ from mp3_player import Mp3Player
 from glob import glob
 from PyQt6.QtCore import QThread
 import time
+import sqlite3
+from random import shuffle
+from localization import Localization
 
 class MainProgram():
     def __init__(self):
         self.tracks = []
+        self.volume = 1
         self.pitch = 1
+        self.language = "english"
         self.folders = []
         self.workdir = os.getcwd()
         self._window = None
 
+        self._repeat = False
+        
         self._channel = None
 
         self._threads = []
@@ -27,8 +34,9 @@ class MainProgram():
         
         self.load_config()
             
-        self.search_tracks(len(self.folders) == 0)
+        self.search_tracks()
 
+        self.localization = Localization(self.language)
         self.init_window()
 
     @property
@@ -52,30 +60,39 @@ class MainProgram():
         return not self._channel[1]
     
     def load_config(self):
-        path = Path(f"{self.workdir}/config.txt")
-        if(not path.is_file()):
-            return
+        try:
+            path = Path(f"{self.workdir}/config.txt")
+            if(not path.is_file()):
+                return
         
-        f = open("config.txt", "r")
+            f = open("config.txt", "r")
 
-        folders = False
-        for line in f:
-            l = line.replace('\n', '')
-            if(l == "folders:"):
-                folders = True
-            elif(folders):
-                self.folders.append(l)
-            else:
-                tokens = l.split("=")
-                if(len(tokens) == 2):
-                    if(tokens[0] == "pitch"):
-                        self.pitch = float(tokens[1])
-                pass
-        
+            folders = False
+            for line in f:
+                l = line.replace('\n', '')
+                if(l == "folders:"):
+                    folders = True
+                elif(folders):
+                    self.folders.append(l)
+                else:
+                    tokens = l.split("=")
+                    if(len(tokens) == 2):
+                        if(tokens[0] == "pitch"):
+                            self.pitch = float(tokens[1])
+                        elif(tokens[0] == "volume"):
+                            self.volume = float(tokens[1])
+                        elif(tokens[0] == "language"):
+                            self.language = tokens[1]
+                    pass
+        except Exception as ex:
+            print (ex)
+            
 
     def save_config(self):
         f = open("config.txt", "w")
+        f.write(f"volume={self.volume}\n")
         f.write(f"pitch={self.pitch}\n")
+        f.write(f"language={self.language}\n")
         f.write("folders:")
         for folder in self.folders:
             f.write(f"\n{folder}");
@@ -120,6 +137,29 @@ class MainProgram():
         if(self._window != None):
             self._window.update_tracklist()
 
+    def shuffle_order(self):
+        if(len(self._track_order) == 0):
+            return
+
+        if(len(self._track_order) <= self._track_index):
+            self._track_index = 0
+
+       
+        queue_id = self._track_order[self._track_index][0]
+        
+        shuffle(self._track_order)
+        ind = 0
+        for index, track in enumerate(self._track_order):
+            if(track[0] == queue_id):
+                tr = track[0]
+                ind = index
+
+        self._track_order[ind], self._track_order[0] = self._track_order[0], self._track_order[ind]
+        self._track_index = 0
+        
+        if(self._mp3_player == None):
+            self.play_by_id(queue_id)
+
     def set_pitch(self, value):
         if(value < 0.1):
             value = 0.1
@@ -129,6 +169,21 @@ class MainProgram():
         self.pitch = value
         self.save_config()
 
+    def set_volume(self, value):
+        if(value < 0):
+            value = 0
+        elif(value > 1):
+            value = 1
+
+        self.volume = value
+        self.save_config()
+
+        if(self._mp3_player != None):
+            self._channel[6] = self.volume
+
+    def set_repeat(self):
+        self._repeat = not self._repeat
+    
     def add_folder(self, folder):
         self.folders.append(folder)
         self.save_config()
@@ -149,6 +204,9 @@ class MainProgram():
         
         self._track_index += 1
         if(len(self._track_order) > self._track_index):
+            self.play(self._track_order[self._track_index][1])
+        elif(self._repeat and len(self._track_order) > 0):
+            self._track_index = 0;
             self.play(self._track_order[self._track_index][1])
         else:
             self._window.check_pause()
@@ -174,7 +232,7 @@ class MainProgram():
                 self.track_finished()
 
     def enqueue_single(self, track):
-        if(self._mp3_player != None and self._channel[6] == track):
+        if(self._mp3_player != None and self._channel[5] == track):
             entry = self._track_order[self._track_index]
             self._increment_id = entry[0] + 1
             self._track_order.clear()
@@ -189,12 +247,26 @@ class MainProgram():
         
         if(self._mp3_player != None):
             self._mp3_player.dispose()
-            self._channel[4] = True
-            self._channel[1] = False
             self._mp3_player = None
             
         self.enqueue(track)
 
+    def next_track(self):
+        if(self._track_index + 1 >= len(self._track_order)):
+            if(self._repeat):
+                self._track_index = -1
+            else:
+                return
+        
+        self.track_finished()
+    
+    def previos_track(self):
+        if(self._track_index - 1 < 0):
+            return
+        
+        self._track_index -= 2
+        self.track_finished()
+    
     def play_by_id(self, order_id):
         ind = 0
         for index, track in enumerate(self._track_order):
@@ -209,17 +281,25 @@ class MainProgram():
         self._track_index = ind
         self.play(self._track_order[ind][1])
         
+    def play_all(self):
+        self._increment_id = 0
+        self._track_order.clear()
         
+        if(self._mp3_player != None):
+            self._mp3_player.dispose()
+            self._mp3_player = None
+            
+        for x in self.tracks:
+            self.enqueue(x)
+    
     def play(self, track):
         
         self._window.track_changed(track)
 
         if(self._mp3_player != None):
             self._mp3_player.dispose()
-            self._channel[4] = True
-            self._channel[1] = False
                 
-        self._channel = [-1, True, 0, 0, False, 0, track]
+        self._channel = [-1, True, 0, 0, 0, track, self.volume]
         self._current_track = track
             
         self._threads.append(QThread())
@@ -238,7 +318,7 @@ class MainProgram():
     def track_seek(self, position):
         if(len(self._track_order) == 0):
             if(self._channel != None and self._mp3_player == None):
-                self.enqueue_single(self._channel[6]);
+                self.enqueue_single(self._channel[5]);
                 self._window.update_queue()
             return
         
@@ -252,7 +332,7 @@ class MainProgram():
     def pause(self):
         if(len(self._track_order) == 0):
             if(self._channel != None and self._mp3_player == None):
-                self.enqueue_single(self._channel[6]);
+                self.enqueue_single(self._channel[5]);
                 self._window.update_queue()
             return
         
