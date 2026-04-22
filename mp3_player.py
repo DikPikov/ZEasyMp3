@@ -139,5 +139,6 @@ class Mp3Player(QObject):
         self._channel[2] = audio.info.length / self._pitch
         self._channel[1] = True
         self._channel[4] = total_bytes = audio.info.length * audio.info.sample_rate * audio.info.channels * 4
+        self._audio_sink.setVolume(self._volume)
         
 
